@@ -17,6 +17,7 @@ import calendar
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
+from zoneinfo import ZoneInfo
 
 from flask import (
     Flask, request, session, redirect, url_for, render_template,
@@ -44,6 +45,16 @@ CATEGORIES = ["마감재", "가구·붙박이장", "전기·조명", "설비", "
 STAGES = ["접수완료", "담당자확인", "일정편성완료", "처리완료"]
 URGENT_DAYS = 2          # 처리완료 제외, 접수 후 경과일이 이 값 이상이면 긴급
 START_ID = 100001        # 6자리 접수번호 시작값
+
+# 서버 구동 위치(리전)와 무관하게 모든 시각을 한국 표준시(KST, UTC+9) 기준으로 기록·표시한다.
+KST = ZoneInfo("Asia/Seoul")
+
+
+def kst_now():
+    """현재 시각을 한국 표준시(KST) 기준의 naive datetime으로 반환한다.
+    DB에는 타임존 정보 없이 'KST 벽시계 시각' 문자열로 저장하므로,
+    기존에 저장된 값과 동일한 방식(naive datetime 비교)으로 계속 다룰 수 있다."""
+    return datetime.now(KST).replace(tzinfo=None)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(16))
@@ -155,7 +166,7 @@ def next_request_id(conn):
 
 
 def now_iso():
-    return datetime.now().isoformat(timespec="seconds")
+    return kst_now().isoformat(timespec="seconds")
 
 
 def parse_dt(s):
@@ -178,7 +189,7 @@ def is_urgent(row):
     created = parse_dt(row["created_at"])
     if not created:
         return False
-    return (datetime.now() - created) >= timedelta(days=URGENT_DAYS)
+    return (kst_now() - created) >= timedelta(days=URGENT_DAYS)
 
 
 def row_to_dict(row):
@@ -341,7 +352,7 @@ def status_check():
 @manager_required
 def dashboard():
     view = request.args.get("view", "calendar")
-    today = datetime.now()
+    today = kst_now()
     year = int(request.args.get("year", today.year))
     month = int(request.args.get("month", today.month))
     selected_date = request.args.get("date")  # YYYY-MM-DD
@@ -466,12 +477,12 @@ def summary():
         d["d_receive_to_confirm"] = days_between(created, confirmed)
         d["d_confirm_to_schedule"] = days_between(confirmed, scheduled)
         d["d_schedule_to_complete"] = days_between(scheduled, completed)
-        d["d_total"] = days_between(created, completed or datetime.now())
+        d["d_total"] = days_between(created, completed or kst_now())
         d["d_total_open"] = completed is None
         items.append(d)
 
     # 월간 보고 대상 월 (기본: 전월)
-    today = datetime.now()
+    today = kst_now()
     default_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     target_month = request.args.get("month", default_month)
 
