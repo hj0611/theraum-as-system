@@ -1,0 +1,19 @@
+services:
+  - type: web
+      name: theraum-as-system
+          env: python
+              plan: free
+                  buildCommand: "pip install -r requirements.txt"
+                      startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 60"
+                          envVars:
+                                - key: MANAGER_PASSCODE
+                                        sync: false
+                                              - key: SECRET_KEY
+                                                      generateValue: true
+                                                            - key: PYTHON_VERSION
+                                                                    value: 3.11.9
+                                                                          - key: TURSO_DATABASE_URL
+                                                                                  sync: false
+                                                                                        - key: TURSO_AUTH_TOKEN
+                                                                                                sync: false
+                                                                                                
