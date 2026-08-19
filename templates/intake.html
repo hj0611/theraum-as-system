@@ -11,8 +11,11 @@
   <form id="intake-form" autocomplete="off">
     <div class="form-row">
       <div class="form-group">
-        <label>단지명</label>
-        <input type="text" name="complex_name" placeholder="예: THE RAUM">
+        <label>단지명<span class="req">*</span></label>
+        <div class="address-search-row">
+          <input type="text" name="complex_name" id="complex-name-input" class="input-readonly" placeholder="주소검색 버튼으로 단지를 선택해주세요" readonly required>
+          <button type="button" class="btn btn-outline btn-sm" id="address-search-btn">주소검색</button>
+        </div>
       </div>
     </div>
     <div class="form-row">
@@ -54,7 +57,7 @@
     </div>
 
     <div class="form-group">
-      <label>사진 첨부 <span style="font-weight:400;color:var(--raum-gray-500)">(선택, 최대 5장)</span></label>
+      <label>사진 첨부 <span style="font-weight:400;color:var(--raum-gray-500)">(선택, 최대 10장)</span></label>
       <div class="file-drop" id="file-drop">사진을 선택하거나 여기로 끌어다 놓아주세요</div>
       <input type="file" name="photos" id="photo-input" accept="image/*" multiple style="display:none">
       <div class="file-preview-list" id="preview-list"></div>
@@ -80,8 +83,24 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <script>
 (function () {
+  var complexNameInput = document.getElementById("complex-name-input");
+  var addressSearchBtn = document.getElementById("address-search-btn");
+
+  function openAddressSearch() {
+    new daum.Postcode({
+      oncomplete: function (data) {
+        var addr = data.roadAddress || data.jibunAddress || data.address;
+        var complexName = data.buildingName && data.buildingName.trim() ? data.buildingName : addr;
+        complexNameInput.value = complexName;
+      }
+    }).open();
+  }
+  addressSearchBtn.addEventListener("click", openAddressSearch);
+  complexNameInput.addEventListener("click", openAddressSearch);
+
   var fileInput = document.getElementById("photo-input");
   var drop = document.getElementById("file-drop");
   var previewList = document.getElementById("preview-list");
@@ -89,7 +108,7 @@
 
   drop.addEventListener("click", function () { fileInput.click(); });
   fileInput.addEventListener("change", function () {
-    files = Array.from(fileInput.files).slice(0, 5);
+    files = Array.from(fileInput.files).slice(0, 10);
     previewList.innerHTML = "";
     files.forEach(function (f) {
       var img = document.createElement("img");
