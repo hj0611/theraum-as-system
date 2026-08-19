@@ -1,8 +1,11 @@
-<div class="request-item {% if it.urgent %}urgent{% endif %} {% if not it.manager_checked %}unchecked{% endif %}">
+<div class="request-item {% if it.urgent %}urgent{% endif %} {% if not it.manager_checked %}unchecked{% endif %}" data-req-id="{{ it.id }}">
   <div class="req-top">
-    <div>
-      <div class="req-id">#{{ it.id }} · {{ it.category }}</div>
-      <div class="req-meta">{{ it.complex_name }} {{ it.dong }} {{ it.ho }} · {{ it.customer_name }} · {{ it.created_at.replace("T"," ") }}{% if it.checked_by %} · 확인자: {{ it.checked_by }}{% endif %}</div>
+    <div class="req-top-left">
+      <input type="checkbox" class="req-checkbox" value="{{ it.id }}" aria-label="#{{ it.id }} 선택">
+      <div>
+        <div class="req-id">#{{ it.id }} · {{ it.category }}</div>
+        <div class="req-meta">{{ it.complex_name }} {{ it.dong }} {{ it.ho }} · {{ it.customer_name }} · {{ it.created_at.replace("T"," ") }}{% if it.checked_by %} · 확인자: {{ it.checked_by }}{% endif %}</div>
+      </div>
     </div>
     <div class="badge-row">
       {% if it.urgent %}<span class="badge badge-urgent">긴급</span>{% endif %}

@@ -56,6 +56,12 @@
 {% if selected_date %}
 <div class="day-panel">
   <div class="section-title">{{ selected_date }} 접수 내역 ({{ day_items|length }}건)</div>
+  {% if day_items %}
+  <div class="bulk-actions">
+    <label class="bulk-select-all"><input type="checkbox" class="select-all-checkbox"> 전체 선택</label>
+    <button type="button" class="btn btn-danger btn-sm btn-bulk-delete" disabled>선택 삭제 (<span class="selected-count">0</span>)</button>
+  </div>
+  {% endif %}
   {% if not day_items %}
     <div class="empty-state">해당 날짜에 접수된 건이 없습니다.</div>
   {% endif %}
@@ -67,6 +73,12 @@
 
 {% else %}
 <div class="day-panel">
+  {% if items %}
+  <div class="bulk-actions">
+    <label class="bulk-select-all"><input type="checkbox" class="select-all-checkbox"> 전체 선택</label>
+    <button type="button" class="btn btn-danger btn-sm btn-bulk-delete" disabled>선택 삭제 (<span class="selected-count">0</span>)</button>
+  </div>
+  {% endif %}
   {% for it in items %}
     {% if loop.changed(it.created_at[:10]) %}
     <div class="day-divider"><span>{{ it.created_at[:10] }}</span></div>
@@ -77,4 +89,70 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var selectAll = document.querySelector(".select-all-checkbox");
+  var deleteBtn = document.querySelector(".btn-bulk-delete");
+  var countEl = document.querySelector(".selected-count");
+  if (!deleteBtn) return;
+
+  function checkboxes() {
+    return Array.prototype.slice.call(document.querySelectorAll(".req-checkbox"));
+  }
+
+  function refresh() {
+    var checked = checkboxes().filter(function (c) { return c.checked; });
+    countEl.textContent = checked.length;
+    deleteBtn.disabled = checked.length === 0;
+    if (selectAll) {
+      selectAll.checked = checked.length > 0 && checked.length === checkboxes().length;
+    }
+  }
+
+  document.addEventListener("change", function (e) {
+    if (e.target.classList.contains("req-checkbox")) refresh();
+  });
+
+  if (selectAll) {
+    selectAll.addEventListener("change", function () {
+      checkboxes().forEach(function (c) { c.checked = selectAll.checked; });
+      refresh();
+    });
+  }
+
+  deleteBtn.addEventListener("click", function () {
+    var ids = checkboxes().filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+    if (!ids.length) return;
+    if (!window.confirm(ids.length + "건을 삭제하시겠습니까? 삭제한 내용은 복구할 수 없습니다.")) return;
+
+    var params = new URLSearchParams();
+    ids.forEach(function (id) { params.append("req_ids", id); });
+
+    deleteBtn.disabled = true;
+    fetch("{{ url_for('manager_delete') }}", {
+      method: "POST",
+      headers: { "X-Requested-With": "fetch", "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data && data.ok) {
+          window.location.reload();
+        } else {
+          alert("삭제 중 오류가 발생했습니다. 다시 시도해주세요.");
+          deleteBtn.disabled = false;
+        }
+      })
+      .catch(function () {
+        alert("삭제 중 오류가 발생했습니다. 다시 시도해주세요.");
+        deleteBtn.disabled = false;
+      });
+  });
+
+  refresh();
+})();
+</script>
 {% endblock %}
