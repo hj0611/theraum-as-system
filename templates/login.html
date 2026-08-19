@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}담당자 로그인 | THE RAUM{% endblock %}
+{% block content %}
+<h1 class="page-title">담당자 로그인</h1>
+<p class="page-desc">대시보드 접속을 위한 접속코드를 입력해주세요.</p>
+{% if error %}<div class="error-box">{{ error }}</div>{% endif %}
+<div class="card">
+  <form method="post">
+    <div class="form-group">
+      <label>접속코드<span class="req">*</span></label>
+      <input type="password" name="passcode" required autofocus>
+    </div>
+    <button type="submit" class="btn btn-primary">로그인</button>
+  </form>
+</div>
+{% endblock %}

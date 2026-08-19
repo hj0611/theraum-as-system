@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}진행상태 확인 | THE RAUM{% endblock %}
+{% block header_right %}
+  <a href="{{ url_for('intake') }}" class="header-link">새 접수</a>
+{% endblock %}
+{% block content %}
+<h1 class="page-title">진행상태 확인</h1>
+<p class="page-desc">접수번호와 연락처 뒷 4자리를 입력하시면 처리 진행 상황을 확인하실 수 있습니다.</p>
+
+{% if error %}
+<div class="error-box">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:20px;">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label>접수번호<span class="req">*</span></label>
+        <input type="text" name="request_id" inputmode="numeric" maxlength="6" placeholder="100001" value="{{ prefill_id }}" required>
+      </div>
+      <div class="form-group">
+        <label>연락처 뒷 4자리<span class="req">*</span></label>
+        <input type="text" name="phone_last4" inputmode="numeric" maxlength="4" placeholder="0000" required>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">조회하기</button>
+  </form>
+</div>
+
+{% if result %}
+<div class="card">
+  <div class="section-title">
+    접수번호 {{ result.id }}
+    {% if result.urgent %}<span class="badge badge-urgent">긴급</span>{% endif %}
+  </div>
+
+  <div class="tracker">
+    {% for s in stages %}
+    <div class="tracker-step {% if loop.index0 < result.stage_index %}done{% elif loop.index0 == result.stage_index %}current{% endif %}">
+      <div class="tracker-dot">{% if loop.index0 < result.stage_index %}✓{% else %}{{ loop.index }}{% endif %}</div>
+      <div class="tracker-label">{{ s }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="info-list">
+    <div class="info-row"><div class="k">접수일시</div><div class="v">{{ result.created_at.replace("T", " ") }}</div></div>
+    <div class="info-row"><div class="k">위치</div><div class="v">{{ result.complex_name }} {{ result.dong }} {{ result.ho }}</div></div>
+    <div class="info-row"><div class="k">카테고리</div><div class="v">{{ result.category }}</div></div>
+    <div class="info-row"><div class="k">상세내용</div><div class="v">{{ result.description }}</div></div>
+    {% if result.scheduled_date %}
+    <div class="info-row"><div class="k">방문예정</div><div class="v">{{ result.scheduled_date }}</div></div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<footer class="foot-note">THE RAUM 고객지원 · AS 접수 시스템</footer>
+{% endblock %}

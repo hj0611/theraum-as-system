@@ -1,0 +1,45 @@
+<div class="request-item {% if it.urgent %}urgent{% endif %} {% if not it.manager_checked %}unchecked{% endif %}">
+  <div class="req-top">
+    <div>
+      <div class="req-id">#{{ it.id }} · {{ it.category }}</div>
+      <div class="req-meta">{{ it.complex_name }} {{ it.dong }} {{ it.ho }} · {{ it.customer_name }} · {{ it.created_at.replace("T"," ") }}</div>
+    </div>
+    <div class="badge-row">
+      {% if it.urgent %}<span class="badge badge-urgent">긴급</span>{% endif %}
+      {% if not it.manager_checked %}<span class="badge badge-unchecked">미확인</span>{% endif %}
+      <span class="badge badge-status">{{ it.status }}</span>
+    </div>
+  </div>
+  <div class="req-desc">{{ it.description }}</div>
+  {% if it.photos %}
+  <div class="req-photos">
+    {% for p in it.photos %}
+    <a href="{{ url_for('uploaded_file', req_id=it.id, filename=p) }}" target="_blank"><img src="{{ url_for('uploaded_file', req_id=it.id, filename=p) }}" alt="첨부사진"></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="action-form">
+    {% if it.status == '접수완료' %}
+    <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}">
+      <input type="hidden" name="action" value="check">
+      <button class="btn btn-outline btn-sm" type="submit">담당자 확인</button>
+    </form>
+    {% endif %}
+
+    {% if it.status in ['접수완료','담당자확인'] %}
+    <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}" class="action-form" style="margin:0">
+      <input type="hidden" name="action" value="schedule">
+      <input type="date" name="scheduled_date" required style="width:150px">
+      <button class="btn btn-outline btn-sm" type="submit">일정편성완료</button>
+    </form>
+    {% endif %}
+
+    {% if it.status != '처리완료' %}
+    <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}">
+      <input type="hidden" name="action" value="complete">
+      <button class="btn btn-primary btn-sm" type="submit">처리완료</button>
+    </form>
+    {% endif %}
+  </div>
+</div>

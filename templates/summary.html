@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}DB요약 · 월간보고 | THE RAUM{% endblock %}
+{% block page_class %}wide{% endblock %}
+{% block header_right %}
+  <div class="btn-row">
+    <a href="{{ url_for('dashboard') }}" class="header-link">대시보드</a>
+    <a href="{{ url_for('logout') }}" class="header-link">로그아웃</a>
+  </div>
+{% endblock %}
+{% block content %}
+<h1 class="page-title">DB요약 · 월간보고</h1>
+<p class="page-desc">전 건을 한 페이지로 확인하고, 월 단위 반복 이슈를 자동 집계합니다. (모바일에서는 표 대신 카드형으로 표시됩니다)</p>
+
+<div class="tabs">
+  <a href="#db-summary" class="tab-link active" data-tab="db-summary">DB 자동요약</a>
+  <a href="#monthly-report" class="tab-link" data-tab="monthly-report">월간 자동보고</a>
+</div>
+
+<div id="db-summary" class="section-block tab-panel">
+  <div class="section-title">DB 자동요약 <span style="font-weight:400;color:var(--raum-gray-500);font-size:12.5px">· 총 {{ items|length }}건 · 접수일 기준 단계별 소요일(day) 자동 계산</span></div>
+
+  {% if not items %}
+    <div class="empty-state">접수된 건이 없습니다.</div>
+  {% else %}
+  <!-- 데스크톱: 표 -->
+  <div class="table-wrap card" style="padding:0;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>접수번호</th><th>접수일</th><th>위치</th><th>카테고리</th><th>상태</th>
+          <th>접수→확인</th><th>확인→일정</th><th>일정→완료</th><th>총 소요일</th><th>상세</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.id }}{% if it.urgent %} <span class="badge badge-urgent">긴급</span>{% endif %}</td>
+          <td>{{ it.created_at[:10] }}</td>
+          <td>{{ it.dong }} {{ it.ho }}</td>
+          <td>{{ it.category }}</td>
+          <td><span class="badge badge-status">{{ it.status }}</span></td>
+          <td>{{ it.d_receive_to_confirm if it.d_receive_to_confirm is not none else '-' }}</td>
+          <td>{{ it.d_confirm_to_schedule if it.d_confirm_to_schedule is not none else '-' }}</td>
+          <td>{{ it.d_schedule_to_complete if it.d_schedule_to_complete is not none else '-' }}</td>
+          <td>{{ it.d_total }}{{ ' (진행중)' if it.d_total_open else '' }}</td>
+          <td class="desc-cell">{{ it.description }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 모바일: 카드형 레이아웃 (표 가독성 문제 해결) -->
+  <div class="card-list">
+    {% for it in items %}
+    <div class="data-card {% if it.urgent %}urgent{% endif %}">
+      <div class="data-card-head">
+        <span class="id">#{{ it.id }}</span>
+        <span class="badge badge-status">{{ it.status }}</span>
+      </div>
+      <div class="data-card-row"><span class="k">접수일</span><span class="v">{{ it.created_at[:10] }}</span></div>
+      <div class="data-card-row"><span class="k">위치</span><span class="v">{{ it.dong }} {{ it.ho }}</span></div>
+      <div class="data-card-row"><span class="k">카테고리</span><span class="v">{{ it.category }}</span></div>
+      <div class="data-card-row"><span class="k">접수→확인</span><span class="v">{{ it.d_receive_to_confirm if it.d_receive_to_confirm is not none else '-' }}일</span></div>
+      <div class="data-card-row"><span class="k">확인→일정</span><span class="v">{{ it.d_confirm_to_schedule if it.d_confirm_to_schedule is not none else '-' }}일</span></div>
+      <div class="data-card-row"><span class="k">일정→완료</span><span class="v">{{ it.d_schedule_to_complete if it.d_schedule_to_complete is not none else '-' }}일</span></div>
+      <div class="data-card-row"><span class="k">총 소요일</span><span class="v">{{ it.d_total }}{{ ' (진행중)' if it.d_total_open else '' }}</span></div>
+      <div class="data-card-row"><span class="k">상세</span><span class="v" style="text-align:left;max-width:60%;">{{ it.description }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div id="monthly-report" class="section-block tab-panel" style="display:none">
+  <div class="month-select">
+    <form method="get" style="display:flex;gap:8px;align-items:center;">
+      <input type="hidden" name="tab" value="monthly-report">
+      <label style="margin:0;">기준월</label>
+      <select name="month" onchange="this.form.submit()">
+        {% for m in available_months %}
+        <option value="{{ m }}" {% if m == target_month %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+        {% if target_month not in available_months %}
+        <option value="{{ target_month }}" selected>{{ target_month }}</option>
+        {% endif %}
+      </select>
+    </form>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <div class="section-title">{{ target_month }} 카테고리별 접수 현황 <span style="font-weight:400;color:var(--raum-gray-500);font-size:12.5px">· 총 {{ month_items|length }}건</span></div>
+    {% set max_count = (cat_counts.values() | list | max) if cat_counts else 0 %}
+    {% for c, cnt in cat_counts.items() %}
+    <div class="cat-bar-row">
+      <div class="cat-bar-label">{{ c }}</div>
+      <div class="cat-bar-track"><div class="cat-bar-fill" style="width: {{ (cnt / max_count * 100) if max_count else 0 }}%"></div></div>
+      <div class="cat-bar-count">{{ cnt }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="section-title">반복이슈 자동 집계 <span style="font-weight:400;color:var(--raum-gray-500);font-size:12.5px">· 동일 위치·카테고리 3회 이상</span></div>
+    {% if not repeat_issues %}
+      <div class="empty-state">{{ target_month }} 기준 3회 이상 반복된 이슈가 없습니다.</div>
+    {% else %}
+      {% for r in repeat_issues %}
+      <div class="repeat-card">
+        <div class="rc-title">{{ r.dong }} {{ r.ho }} · {{ r.category }} — {{ r.count }}회 반복</div>
+        <div class="rc-sub">접수번호: {% for it in r.reqs %}{{ it.id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var tabs = document.querySelectorAll(".tab-link");
+  var panels = document.querySelectorAll(".tab-panel");
+  function activate(id) {
+    tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.tab === id); });
+    panels.forEach(function (p) { p.style.display = (p.id === id) ? "" : "none"; });
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function (e) {
+      e.preventDefault();
+      activate(t.dataset.tab);
+      history.replaceState(null, "", "#" + t.dataset.tab);
+    });
+  });
+  var params = new URLSearchParams(window.location.search);
+  var initial = (window.location.hash || "").replace("#", "") || params.get("tab") || "db-summary";
+  activate(initial);
+})();
+</script>
+{% endblock %}
