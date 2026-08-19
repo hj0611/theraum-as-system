@@ -63,6 +63,31 @@
       <div class="file-preview-list" id="preview-list"></div>
     </div>
 
+    <div class="form-group consent-group">
+      <div class="consent-box" id="consent-box">
+        <p class="consent-summary">
+          THE RAUM은 AS 접수 및 처리를 위해 아래와 같이 <strong>개인정보를 수집·이용</strong>합니다.
+          <button type="button" class="consent-toggle" id="consent-toggle" aria-expanded="false">자세히 보기</button>
+        </p>
+        <div class="consent-detail" id="consent-detail" hidden>
+          <dl>
+            <dt>수집 항목</dt>
+            <dd>성함, 연락처, 단지명·동·호수, 접수 내용, 첨부 사진(선택)</dd>
+            <dt>수집 목적</dt>
+            <dd>AS 접수 확인 및 처리, 처리 결과 안내, 문의 응대</dd>
+            <dt>보유 및 이용 기간</dt>
+            <dd>AS 처리 완료 후 1년간 보관 후 파기 (단, 관계 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관)</dd>
+            <dt>동의 거부 권리 및 불이익</dt>
+            <dd>귀하는 개인정보 수집·이용에 대한 동의를 거부할 권리가 있습니다. 다만 동의하지 않으실 경우 AS 접수 진행이 제한될 수 있습니다.</dd>
+          </dl>
+        </div>
+      </div>
+      <label class="consent-check">
+        <input type="checkbox" name="privacy_consent" id="privacy-consent-checkbox" value="y" required>
+        <span>위 개인정보 수집 및 이용에 동의합니다.<span class="req">*</span></span>
+      </label>
+    </div>
+
     <div id="submit-error" class="error-box" style="display:none"></div>
 
     <button type="submit" class="btn btn-primary" id="submit-btn">접수하기</button>
@@ -124,6 +149,26 @@
   addressModalClose.addEventListener("click", closeAddressSearch);
   addressModal.addEventListener("click", function (e) {
     if (e.target === addressModal) closeAddressSearch();
+  });
+
+  var consentToggle = document.getElementById("consent-toggle");
+  var consentDetail = document.getElementById("consent-detail");
+  var consentCheckbox = document.getElementById("privacy-consent-checkbox");
+  var consentBox = document.getElementById("consent-box");
+
+  consentToggle.addEventListener("click", function () {
+    var expanded = consentToggle.getAttribute("aria-expanded") === "true";
+    consentDetail.hidden = expanded;
+    consentToggle.setAttribute("aria-expanded", String(!expanded));
+    consentToggle.textContent = expanded ? "자세히 보기" : "접기";
+  });
+  consentBox.addEventListener("click", function (e) {
+    if (e.target === consentToggle) return;
+    if (!consentDetail.hidden) return;
+    consentToggle.click();
+  });
+  consentCheckbox.addEventListener("invalid", function () {
+    if (consentDetail.hidden) consentToggle.click();
   });
 
   var fileInput = document.getElementById("photo-input");
