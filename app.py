@@ -12,6 +12,7 @@ Flask + SQLite 기반 실배포용 애플리케이션
 import os
 import json
 import mimetypes
+import shutil
 import sqlite3
 import calendar
 import secrets
@@ -475,6 +476,42 @@ def manager_update(req_id):
 
     if request.headers.get("X-Requested-With") == "fetch":
         return jsonify({"ok": True})
+    return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.route("/manager/delete", methods=["POST"])
+@manager_required
+def manager_delete():
+    """대시보드에서 체크박스로 선택한 접수 건을 일괄 삭제한다.
+    (건 1개만 선택해도 동작 — '건별 선택 삭제'는 선택 개수 1건 이상을 지원하는 것으로 구현)"""
+    raw_ids = request.form.getlist("req_ids")
+    ids = []
+    for v in raw_ids:
+        try:
+            ids.append(int(v))
+        except (TypeError, ValueError):
+            continue
+    ids = sorted(set(ids))
+
+    deleted = 0
+    if ids:
+        conn = get_db()
+        placeholders = ",".join("?" for _ in ids)
+        if USE_TURSO:
+            # Turso 사용 시 사진 원본이 photos 테이블에 저장되므로 함께 삭제한다.
+            conn.execute(f"DELETE FROM photos WHERE request_id IN ({placeholders})", ids)
+        conn.execute(f"DELETE FROM requests WHERE id IN ({placeholders})", ids)
+        conn.commit()
+        conn.close()
+        deleted = len(ids)
+
+        if not USE_TURSO:
+            # 로컬 디스크 모드에서는 접수 건별 업로드 사진 폴더도 함께 정리한다.
+            for rid in ids:
+                shutil.rmtree(os.path.join(UPLOAD_DIR, str(rid)), ignore_errors=True)
+
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify({"ok": True, "deleted": deleted})
     return redirect(request.referrer or url_for("dashboard"))
 
 
