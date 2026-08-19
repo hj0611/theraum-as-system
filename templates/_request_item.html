@@ -2,7 +2,7 @@
   <div class="req-top">
     <div>
       <div class="req-id">#{{ it.id }} · {{ it.category }}</div>
-      <div class="req-meta">{{ it.complex_name }} {{ it.dong }} {{ it.ho }} · {{ it.customer_name }} · {{ it.created_at.replace("T"," ") }}</div>
+      <div class="req-meta">{{ it.complex_name }} {{ it.dong }} {{ it.ho }} · {{ it.customer_name }} · {{ it.created_at.replace("T"," ") }}{% if it.checked_by %} · 확인자: {{ it.checked_by }}{% endif %}</div>
     </div>
     <div class="badge-row">
       {% if it.urgent %}<span class="badge badge-urgent">긴급</span>{% endif %}
@@ -21,8 +21,9 @@
 
   <div class="action-form">
     {% if it.status == '접수완료' %}
-    <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}">
+    <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}" class="check-form">
       <input type="hidden" name="action" value="check">
+      <input type="text" name="checked_by" class="input-checked-by" placeholder="담당자 성함" required>
       <button class="btn btn-outline btn-sm" type="submit">담당자 확인</button>
     </form>
     {% endif %}

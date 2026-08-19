@@ -68,6 +68,9 @@
 {% else %}
 <div class="day-panel">
   {% for it in items %}
+    {% if loop.changed(it.created_at[:10]) %}
+    <div class="day-divider"><span>{{ it.created_at[:10] }}</span></div>
+    {% endif %}
     {% include "_request_item.html" %}
   {% endfor %}
   {% if not items %}<div class="empty-state">접수된 건이 없습니다.</div>{% endif %}

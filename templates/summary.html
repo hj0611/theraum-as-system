@@ -33,6 +33,9 @@
       </thead>
       <tbody>
         {% for it in items %}
+        {% if loop.changed(it.created_at[:10]) %}
+        <tr class="day-divider-row"><td colspan="10">{{ it.created_at[:10] }}</td></tr>
+        {% endif %}
         <tr>
           <td>{{ it.id }}{% if it.urgent %} <span class="badge badge-urgent">긴급</span>{% endif %}</td>
           <td>{{ it.created_at[:10] }}</td>
@@ -53,6 +56,9 @@
   <!-- 모바일: 카드형 레이아웃 (표 가독성 문제 해결) -->
   <div class="card-list">
     {% for it in items %}
+    {% if loop.changed(it.created_at[:10]) %}
+    <div class="day-divider"><span>{{ it.created_at[:10] }}</span></div>
+    {% endif %}
     <div class="data-card {% if it.urgent %}urgent{% endif %}">
       <div class="data-card-head">
         <span class="id">#{{ it.id }}</span>
@@ -101,13 +107,14 @@
   </div>
 
   <div class="card">
-    <div class="section-title">반복이슈 자동 집계 <span style="font-weight:400;color:var(--raum-gray-500);font-size:12.5px">· 동일 위치·카테고리 3회 이상</span></div>
+    <div class="section-title">반복이슈 자동 집계 <span style="font-weight:400;color:var(--raum-gray-500);font-size:12.5px">· 동일 카테고리 3회 이상</span></div>
     {% if not repeat_issues %}
       <div class="empty-state">{{ target_month }} 기준 3회 이상 반복된 이슈가 없습니다.</div>
     {% else %}
       {% for r in repeat_issues %}
       <div class="repeat-card">
-        <div class="rc-title">{{ r.dong }} {{ r.ho }} · {{ r.category }} — {{ r.count }}회 반복</div>
+        <div class="rc-title">{{ r.category }} — {{ r.count }}회 반복</div>
+        <div class="rc-sub">위치: {% for it in r.reqs %}{{ it.dong }} {{ it.ho }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
         <div class="rc-sub">접수번호: {% for it in r.reqs %}{{ it.id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
       </div>
       {% endfor %}
