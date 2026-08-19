@@ -38,7 +38,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
-MAX_PHOTOS = 5
+MAX_PHOTOS = 10
 
 CATEGORIES = ["마감재", "가구·붙박이장", "전기·조명", "설비", "누수·방수", "에어컨", "기타"]
 STAGES = ["접수완료", "담당자확인", "일정편성완료", "처리완료"]
@@ -230,7 +230,7 @@ def intake():
 @app.route("/submit", methods=["POST"])
 def submit():
     form = request.form
-    required = ["dong", "ho", "customer_name", "phone", "category", "description"]
+    required = ["complex_name", "dong", "ho", "customer_name", "phone", "category", "description"]
     missing = [f for f in required if not form.get(f, "").strip()]
     if missing:
         return jsonify({"ok": False, "error": "필수 항목이 누락되었습니다."}), 400
