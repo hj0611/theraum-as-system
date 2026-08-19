@@ -232,6 +232,18 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
 }
 .modal-note { font-size: 12.5px; color: var(--raum-gray-500); }
 
+.address-modal-box {
+  max-width: 480px; padding: 0; text-align: left; position: relative;
+  animation: pop .18s ease-out;
+}
+.address-modal-close {
+  position: absolute; top: 8px; right: 10px; z-index: 1;
+  width: 32px; height: 32px; border: none; background: transparent;
+  font-size: 22px; line-height: 1; color: var(--raum-gray-500); cursor: pointer;
+}
+.address-modal-close:hover { color: var(--raum-ink); }
+.address-search-embed { width: 100%; height: 460px; border-radius: 14px; overflow: hidden; }
+
 /* ---------------- 진행상태 트래커 ---------------- */
 .tracker {
   display: flex; justify-content: space-between; margin: 22px 0 6px; position: relative;
