@@ -102,6 +102,7 @@ SCHEMA_STATEMENTS = [
         photos TEXT DEFAULT '[]',
         status TEXT NOT NULL DEFAULT '접수완료',
         manager_checked INTEGER NOT NULL DEFAULT 0,
+        checked_by TEXT,
         scheduled_date TEXT,
         memo TEXT,
         created_at TEXT NOT NULL,
@@ -130,11 +131,23 @@ SCHEMA_STATEMENTS = [
     """,
 ]
 
+# 기존에 이미 만들어진 DB(운영 중인 Turso 등)에는 CREATE TABLE IF NOT EXISTS가 적용되지
+# 않으므로, 새로 추가된 컬럼은 아래처럼 ALTER TABLE로 별도 반영한다. 컬럼이 이미 있으면
+# 오류가 발생하므로 무시한다(멱등 처리).
+MIGRATIONS = [
+    "ALTER TABLE requests ADD COLUMN checked_by TEXT",
+]
+
 
 def init_db():
     conn = get_db()
     for stmt in SCHEMA_STATEMENTS:
         conn.execute(stmt)
+    for stmt in MIGRATIONS:
+        try:
+            conn.execute(stmt)
+        except Exception:
+            pass  # 이미 컬럼이 존재하는 등 정상적으로 무시 가능한 오류
     cur = conn.execute("SELECT value FROM counters WHERE name = 'request_id'")
     if cur.fetchone() is None:
         conn.execute(
@@ -423,8 +436,15 @@ def manager_update(req_id):
     ts = now_iso()
 
     if action == "check":
+        checked_by = request.form.get("checked_by", "").strip()
+        if not checked_by:
+            conn.close()
+            if request.headers.get("X-Requested-With") == "fetch":
+                return jsonify({"ok": False, "error": "담당자 성함을 입력해주세요."}), 400
+            return redirect(request.referrer or url_for("dashboard"))
         conn.execute(
-            "UPDATE requests SET manager_checked = 1 WHERE id = ?", (req_id,)
+            "UPDATE requests SET manager_checked = 1, checked_by = ? WHERE id = ?",
+            (checked_by, req_id),
         )
         if row["status"] == "접수완료":
             conn.execute(
@@ -493,16 +513,16 @@ def summary():
     for it in month_items:
         cat_counts[it["category"]] = cat_counts.get(it["category"], 0) + 1
 
-    # 반복이슈: 동일 (동/호/카테고리) 3회 이상
+    # 반복이슈: 동일 카테고리가 해당 월에 3회 이상 접수되면 시공 품질 이슈로 감지
+    # (세대가 서로 달라도 같은 하자 유형이 반복되면 잡히도록 카테고리 단위로 집계한다)
     repeat_map = {}
     for it in month_items:
-        key = (it["dong"], it["ho"], it["category"])
-        repeat_map.setdefault(key, []).append(it)
+        repeat_map.setdefault(it["category"], []).append(it)
     # 주의: dict 키를 'items'로 두면 Jinja2에서 dict.items() 내장 메서드와
     # 충돌하여 TypeError가 발생하므로 'reqs'로 명명한다.
     repeat_issues = [
-        {"dong": k[0], "ho": k[1], "category": k[2], "count": len(v), "reqs": v}
-        for k, v in repeat_map.items()
+        {"category": category, "count": len(v), "reqs": v}
+        for category, v in repeat_map.items()
         if len(v) >= 3
     ]
     repeat_issues.sort(key=lambda x: -x["count"])
