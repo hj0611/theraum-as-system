@@ -80,6 +80,14 @@
     <div class="modal-note">잠시 후 진행상태 확인 화면으로 이동합니다</div>
   </div>
 </div>
+
+<!-- 주소검색(단지명) 팝업 -->
+<div class="modal-overlay" id="address-modal">
+  <div class="modal-box address-modal-box">
+    <button type="button" class="address-modal-close" id="address-modal-close" aria-label="닫기">&times;</button>
+    <div class="address-search-embed" id="address-search-embed"></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -88,18 +96,35 @@
 (function () {
   var complexNameInput = document.getElementById("complex-name-input");
   var addressSearchBtn = document.getElementById("address-search-btn");
+  var addressModal = document.getElementById("address-modal");
+  var addressModalClose = document.getElementById("address-modal-close");
+  var addressEmbedEl = document.getElementById("address-search-embed");
+  var postcodeInstance = null;
 
   function openAddressSearch() {
-    new daum.Postcode({
-      oncomplete: function (data) {
-        var addr = data.roadAddress || data.jibunAddress || data.address;
-        var complexName = data.buildingName && data.buildingName.trim() ? data.buildingName : addr;
-        complexNameInput.value = complexName;
-      }
-    }).open();
+    addressModal.classList.add("open");
+    if (!postcodeInstance) {
+      postcodeInstance = new daum.Postcode({
+        oncomplete: function (data) {
+          var addr = data.roadAddress || data.jibunAddress || data.address;
+          var complexName = data.buildingName && data.buildingName.trim() ? data.buildingName : addr;
+          complexNameInput.value = complexName;
+          addressModal.classList.remove("open");
+        },
+        width: "100%",
+        height: "100%"
+      });
+      postcodeInstance.embed(addressEmbedEl);
+    }
   }
+  function closeAddressSearch() { addressModal.classList.remove("open"); }
+
   addressSearchBtn.addEventListener("click", openAddressSearch);
   complexNameInput.addEventListener("click", openAddressSearch);
+  addressModalClose.addEventListener("click", closeAddressSearch);
+  addressModal.addEventListener("click", function (e) {
+    if (e.target === addressModal) closeAddressSearch();
+  });
 
   var fileInput = document.getElementById("photo-input");
   var drop = document.getElementById("file-drop");
