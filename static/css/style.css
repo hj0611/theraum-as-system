@@ -359,6 +359,8 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
 .request-item.urgent { border-color: var(--raum-red); background: #fff8f7; }
 .request-item.unchecked { border-left: 4px solid var(--raum-orange); }
 .request-item .req-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.req-top-left { display: flex; align-items: flex-start; gap: 10px; }
+.req-checkbox { width: 17px; height: 17px; margin-top: 3px; flex: none; cursor: pointer; accent-color: var(--raum-black); }
 .request-item .req-id { font-weight: 700; font-size: 14.5px; }
 .request-item .req-meta { font-size: 12.5px; color: var(--raum-gray-500); margin-bottom: 8px; }
 .request-item .req-desc { font-size: 13.5px; color: var(--raum-ink); margin-bottom: 10px; line-height: 1.5; }
@@ -372,6 +374,16 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
   width: 110px; padding: 8px 10px; font-size: 13px;
   border: 1px solid var(--raum-gray-300); border-radius: 8px; background: var(--raum-white); color: var(--raum-ink);
 }
+
+/* ---------------- 건별 선택 삭제 ---------------- */
+.bulk-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 14px; padding: 10px 12px;
+  border: 1px solid var(--raum-line); border-radius: 10px; background: var(--raum-gray-100);
+}
+.bulk-select-all { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--raum-gray-700); cursor: pointer; }
+.bulk-select-all input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--raum-black); }
+.btn-bulk-delete:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ---------------- 일별 구분선 ---------------- */
 .day-divider {
