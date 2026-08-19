@@ -235,6 +235,9 @@ def submit():
     if missing:
         return jsonify({"ok": False, "error": "필수 항목이 누락되었습니다."}), 400
 
+    if form.get("privacy_consent") != "y":
+        return jsonify({"ok": False, "error": "개인정보 수집 및 이용에 동의해주세요."}), 400
+
     phone_digits = "".join(ch for ch in form.get("phone", "") if ch.isdigit())
     if len(phone_digits) < 4:
         return jsonify({"ok": False, "error": "연락처를 정확히 입력해주세요."}), 400
