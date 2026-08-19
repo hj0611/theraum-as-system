@@ -160,6 +160,11 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
   .category-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
+.address-search-row { display: flex; gap: 8px; }
+.address-search-row input { flex: 1; min-width: 0; }
+.address-search-row .btn { flex: 0 0 auto; white-space: nowrap; }
+.input-readonly { background: var(--raum-gray-100); cursor: pointer; }
+
 .file-drop {
   border: 1.5px dashed var(--raum-gray-300);
   border-radius: 8px;
