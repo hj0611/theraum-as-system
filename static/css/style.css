@@ -201,6 +201,52 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
 .btn-danger { background: var(--raum-red); color: var(--raum-white); }
 .btn-row { display: flex; gap: 8px; }
 
+.consent-group { margin-bottom: 18px; }
+.consent-box {
+  background: var(--raum-gray-100);
+  border: 1px solid var(--raum-line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+.consent-summary {
+  font-size: 13px;
+  color: var(--raum-gray-700);
+  line-height: 1.5;
+  margin: 0;
+}
+.consent-toggle {
+  display: inline-block;
+  margin-left: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--raum-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.consent-detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--raum-line); }
+.consent-detail dl { margin: 0; font-size: 12.5px; color: var(--raum-gray-700); line-height: 1.6; }
+.consent-detail dt { font-weight: 600; color: var(--raum-ink); margin-top: 8px; }
+.consent-detail dt:first-child { margin-top: 0; }
+.consent-detail dd { margin: 2px 0 0; }
+.consent-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--raum-ink);
+  cursor: pointer;
+  margin-bottom: 0;
+}
+.consent-check input[type="checkbox"] {
+  width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--raum-black); cursor: pointer;
+}
+
 .error-box {
   background: #fdecea;
   color: var(--raum-red);
