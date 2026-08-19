@@ -367,6 +367,24 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
 .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .action-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.check-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0; }
+.input-checked-by {
+  width: 110px; padding: 8px 10px; font-size: 13px;
+  border: 1px solid var(--raum-gray-300); border-radius: 8px; background: var(--raum-white); color: var(--raum-ink);
+}
+
+/* ---------------- 일별 구분선 ---------------- */
+.day-divider {
+  display: flex; align-items: center; gap: 10px;
+  margin: 20px 0 10px; color: var(--raum-gray-500); font-size: 12px; font-weight: 600;
+}
+.day-divider::before, .day-divider::after { content: ""; flex: 1; height: 1px; background: var(--raum-line); }
+.day-panel > .day-divider:first-child, .card-list > .day-divider:first-child { margin-top: 0; }
+tr.day-divider-row td {
+  background: var(--raum-gray-100); color: var(--raum-gray-500);
+  font-size: 11.5px; font-weight: 600; padding: 6px 8px !important;
+  white-space: nowrap; position: static;
+}
 
 /* ---------------- Table (Desktop) & Card (Mobile) ---------------- */
 .table-wrap { overflow-x: auto; }
