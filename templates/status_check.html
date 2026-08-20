@@ -36,8 +36,8 @@
 
   <div class="tracker">
     {% for s in stages %}
-    <div class="tracker-step {% if loop.index0 < result.stage_index %}done{% elif loop.index0 == result.stage_index %}current{% endif %}">
-      <div class="tracker-dot">{% if loop.index0 < result.stage_index %}✓{% else %}{{ loop.index }}{% endif %}</div>
+    <div class="tracker-step {% if loop.index0 <= result.stage_index %}done{% endif %}">
+      <div class="tracker-dot">{% if loop.index0 <= result.stage_index %}✓{% else %}{{ loop.index }}{% endif %}</div>
       <div class="tracker-label">{{ s }}</div>
     </div>
     {% endfor %}
