@@ -306,7 +306,7 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
   color: var(--raum-gray-500);
 }
 .tracker-step.done .tracker-dot { background: var(--raum-black); border-color: var(--raum-black); color: var(--raum-white); }
-.tracker-step.current .tracker-dot { background: var(--raum-white); border-color: var(--raum-black); color: var(--raum-black); }
+.tracker-step.current .tracker-dot { background: var(--raum-white); border-color: var(--raum-black); border-width: 4px; color: var(--raum-black); }
 .tracker-label { font-size: 12px; color: var(--raum-gray-500); }
 .tracker-step.done .tracker-label, .tracker-step.current .tracker-label { color: var(--raum-ink); font-weight: 600; }
 
