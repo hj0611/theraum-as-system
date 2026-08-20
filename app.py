@@ -16,7 +16,6 @@ import sqlite3
 import calendar
 import secrets
 import io
-import threading
 import time
 from datetime import datetime, timedelta
 from functools import wraps
@@ -74,11 +73,9 @@ MANAGER_PASSCODE = os.environ.get("MANAGER_PASSCODE")
 if not MANAGER_PASSCODE or MANAGER_PASSCODE == "theraum2026":
     raise RuntimeError("MANAGER_PASSCODE에 기본값이 아닌 강력한 값을 설정해야 합니다.")
 
-# 프로세스 내부의 최소한의 대입 공격 방어. 여러 인스턴스/워커 환경에서는 Redis 등
-# 공유 저장소 기반 rate limiter로 교체해야 한다.
-_rate_lock = threading.Lock()
-_rate_attempts = {}
-_captcha_challenges = {}
+# 대입 공격 방어. gunicorn을 여러 워커(--workers)로 띄우면 워커마다 별도 프로세스라
+# 파이썬 메모리(dict)를 공유하지 않으므로, 카운터는 DB(로컬 SQLite 또는 Turso — 둘 다
+# 모든 워커가 공유하는 저장소)에 기록해 워커 수와 무관하게 정확히 집계되게 한다.
 RATE_WINDOW_SECONDS = 15 * 60
 
 
@@ -86,52 +83,87 @@ def _client_key():
     return request.remote_addr or "unknown"
 
 
+def _prune_attempts(conn, scope, key, now):
+    conn.execute(
+        "DELETE FROM rate_limit_attempts WHERE scope = ? AND client_key = ? AND created_at < ?",
+        (scope, key, now - RATE_WINDOW_SECONDS),
+    )
+
+
 def rate_limited(scope, limit):
-    now = time.monotonic()
-    key = (scope, _client_key())
-    with _rate_lock:
-        attempts = [t for t in _rate_attempts.get(key, []) if now - t < RATE_WINDOW_SECONDS]
-        _rate_attempts[key] = attempts
-        return len(attempts) >= limit
+    now = time.time()
+    key = _client_key()
+    conn = get_db()
+    _prune_attempts(conn, scope, key, now)
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM rate_limit_attempts WHERE scope = ? AND client_key = ?",
+        (scope, key),
+    ).fetchone()
+    conn.close()
+    return (row["c"] if row else 0) >= limit
 
 
 def failed_attempt_count(scope):
-    now = time.monotonic()
-    key = (scope, _client_key())
-    with _rate_lock:
-        attempts = [t for t in _rate_attempts.get(key, []) if now - t < RATE_WINDOW_SECONDS]
-        _rate_attempts[key] = attempts
-        return len(attempts)
+    now = time.time()
+    key = _client_key()
+    conn = get_db()
+    _prune_attempts(conn, scope, key, now)
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM rate_limit_attempts WHERE scope = ? AND client_key = ?",
+        (scope, key),
+    ).fetchone()
+    conn.close()
+    return row["c"] if row else 0
 
 
 def record_failed_attempt(scope):
-    key = (scope, _client_key())
-    with _rate_lock:
-        now = time.monotonic()
-        attempts = [t for t in _rate_attempts.get(key, []) if now - t < RATE_WINDOW_SECONDS]
-        attempts.append(now)
-        _rate_attempts[key] = attempts
+    now = time.time()
+    key = _client_key()
+    conn = get_db()
+    _prune_attempts(conn, scope, key, now)
+    conn.execute(
+        "INSERT INTO rate_limit_attempts (scope, client_key, created_at) VALUES (?, ?, ?)",
+        (scope, key, now),
+    )
+    conn.commit()
+    conn.close()
 
 
 def captcha_question(scope):
-    """5회 이상 실패한 IP에만 서버 메모리 기반 산술 CAPTCHA를 발급한다."""
-    key = (scope, _client_key())
-    now = time.monotonic()
-    with _rate_lock:
-        challenge = _captcha_challenges.get(key)
-        if not challenge or challenge[2] <= now:
-            first, second = secrets.randbelow(8) + 2, secrets.randbelow(8) + 2
-            challenge = (f"{first} + {second}", str(first + second), now + RATE_WINDOW_SECONDS)
-            _captcha_challenges[key] = challenge
-        return challenge[0]
+    """5회 이상 실패한 클라이언트에만 DB 기반 산술 CAPTCHA를 발급한다."""
+    key = _client_key()
+    now = time.time()
+    conn = get_db()
+    row = conn.execute(
+        "SELECT question, answer, expires_at FROM captcha_challenges WHERE scope = ? AND client_key = ?",
+        (scope, key),
+    ).fetchone()
+    if not row or row["expires_at"] <= now:
+        first, second = secrets.randbelow(8) + 2, secrets.randbelow(8) + 2
+        question = f"{first} + {second}"
+        conn.execute(
+            "INSERT OR REPLACE INTO captcha_challenges (scope, client_key, question, answer, expires_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (scope, key, question, str(first + second), now + RATE_WINDOW_SECONDS),
+        )
+        conn.commit()
+    else:
+        question = row["question"]
+    conn.close()
+    return question
 
 
 def valid_captcha(scope, answer):
-    key = (scope, _client_key())
-    with _rate_lock:
-        challenge = _captcha_challenges.get(key)
-        return bool(challenge and challenge[2] > time.monotonic()
-                    and secrets.compare_digest(str(answer).strip(), challenge[1]))
+    key = _client_key()
+    now = time.time()
+    conn = get_db()
+    row = conn.execute(
+        "SELECT answer, expires_at FROM captcha_challenges WHERE scope = ? AND client_key = ?",
+        (scope, key),
+    ).fetchone()
+    conn.close()
+    return bool(row and row["expires_at"] > now
+                and secrets.compare_digest(str(answer).strip(), row["answer"]))
 
 
 def csrf_token():
@@ -246,6 +278,30 @@ SCHEMA_STATEMENTS = [
         mimetype TEXT,
         data BLOB NOT NULL,
         created_at TEXT NOT NULL
+    )
+    """,
+    # rate_limited()/captcha_question() 등이 쓰는 대입 공격 방어 상태. gunicorn 워커가
+    # 여러 개여도(모두 같은 DB를 보므로) 정확히 집계되도록 프로세스 메모리 대신 여기에 둔다.
+    """
+    CREATE TABLE IF NOT EXISTS rate_limit_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL,
+        client_key TEXT NOT NULL,
+        created_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_scope_key
+        ON rate_limit_attempts (scope, client_key, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS captcha_challenges (
+        scope TEXT NOT NULL,
+        client_key TEXT NOT NULL,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        expires_at REAL NOT NULL,
+        PRIMARY KEY (scope, client_key)
     )
     """,
 ]
