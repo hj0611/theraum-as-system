@@ -9,6 +9,7 @@
 
 <div class="card">
   <form id="intake-form" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-row">
       <div class="form-group">
         <label>단지명<span class="req">*</span></label>
@@ -102,7 +103,7 @@
     <div class="check">✓</div>
     <h2>접수가 완료되었습니다</h2>
     <div class="modal-id" id="modal-req-id">-</div>
-    <div class="modal-note">잠시 후 진행상태 확인 화면으로 이동합니다</div>
+    <div class="modal-note"><strong>접수번호를 분실하지 않도록 반드시 기록해 주세요.</strong><br>잠시 후 진행상태 확인 화면으로 이동합니다.</div>
   </div>
 </div>
 

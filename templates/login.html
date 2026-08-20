@@ -6,6 +6,7 @@
 {% if error %}<div class="error-box">{{ error }}</div>{% endif %}
 <div class="card">
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
       <label>접속코드<span class="req">*</span></label>
       <input type="password" name="passcode" required autofocus>

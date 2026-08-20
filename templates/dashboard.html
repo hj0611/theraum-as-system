@@ -4,7 +4,10 @@
 {% block header_right %}
   <div class="btn-row">
     <a href="{{ url_for('summary') }}" class="header-link">DB요약/월간보고</a>
-    <a href="{{ url_for('logout') }}" class="header-link">로그아웃</a>
+    <form method="post" action="{{ url_for('logout') }}" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="header-link">로그아웃</button>
+    </form>
   </div>
 {% endblock %}
 {% block content %}
@@ -134,7 +137,7 @@
     deleteBtn.disabled = true;
     fetch("{{ url_for('manager_delete') }}", {
       method: "POST",
-      headers: { "X-Requested-With": "fetch", "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { "X-Requested-With": "fetch", "X-CSRF-Token": "{{ csrf_token() }}", "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
     })
       .then(function (res) { return res.json(); })

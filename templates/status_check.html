@@ -13,6 +13,7 @@
 
 <div class="card" style="margin-bottom:20px;">
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-row">
       <div class="form-group">
         <label>접수번호<span class="req">*</span></label>
@@ -23,6 +24,13 @@
         <input type="text" name="phone_last4" inputmode="numeric" maxlength="4" placeholder="0000" required>
       </div>
     </div>
+    {% if captcha_required %}
+    <div class="form-group">
+      <label>사람 확인: {{ captcha_question }} = ?<span class="req">*</span></label>
+      <input type="text" name="captcha" inputmode="numeric" autocomplete="off" required>
+      <small>조회 실패가 반복되어 사람 확인이 필요합니다.</small>
+    </div>
+    {% endif %}
     <button type="submit" class="btn btn-primary">조회하기</button>
   </form>
 </div>

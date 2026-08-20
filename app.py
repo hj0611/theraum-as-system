@@ -11,11 +11,13 @@ Flask + SQLite 기반 실배포용 애플리케이션
 """
 import os
 import json
-import mimetypes
 import shutil
 import sqlite3
 import calendar
 import secrets
+import io
+import threading
+import time
 from datetime import datetime, timedelta
 from functools import wraps
 from zoneinfo import ZoneInfo
@@ -24,7 +26,7 @@ from flask import (
     Flask, request, session, redirect, url_for, render_template,
     jsonify, flash, send_from_directory, abort, Response
 )
-from werkzeug.utils import secure_filename
+from PIL import Image, UnidentifiedImageError
 
 import db_turso
 
@@ -45,7 +47,6 @@ MAX_PHOTOS = 10
 CATEGORIES = ["마감재", "가구·붙박이장", "전기·조명", "설비", "누수·방수", "에어컨", "기타"]
 STAGES = ["접수완료", "담당자확인", "일정편성완료", "처리완료"]
 URGENT_DAYS = 2          # 처리완료 제외, 접수 후 경과일이 이 값 이상이면 긴급
-START_ID = 100001        # 6자리 접수번호 시작값
 
 # 서버 구동 위치(리전)와 무관하게 모든 시각을 한국 표준시(KST, UTC+9) 기준으로 기록·표시한다.
 KST = ZoneInfo("Asia/Seoul")
@@ -58,13 +59,100 @@ def kst_now():
     return datetime.now(KST).replace(tzinfo=None)
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(16))
+secret_key = os.environ.get("SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("SECRET_KEY 환경변수는 운영에 반드시 필요합니다.")
+app.config["SECRET_KEY"] = secret_key
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 요청 전체 20MB 제한
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true",
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
-MANAGER_PASSCODE = os.environ.get("MANAGER_PASSCODE", "theraum2026")
-if os.environ.get("MANAGER_PASSCODE") is None:
-    print("[경고] MANAGER_PASSCODE 환경변수가 설정되지 않아 기본값을 사용합니다. "
-          "실제 운영 배포 시 반드시 별도 값으로 설정하세요.")
+MANAGER_PASSCODE = os.environ.get("MANAGER_PASSCODE")
+if not MANAGER_PASSCODE or MANAGER_PASSCODE == "theraum2026":
+    raise RuntimeError("MANAGER_PASSCODE에 기본값이 아닌 강력한 값을 설정해야 합니다.")
+
+# 프로세스 내부의 최소한의 대입 공격 방어. 여러 인스턴스/워커 환경에서는 Redis 등
+# 공유 저장소 기반 rate limiter로 교체해야 한다.
+_rate_lock = threading.Lock()
+_rate_attempts = {}
+_captcha_challenges = {}
+RATE_WINDOW_SECONDS = 15 * 60
+
+
+def _client_key():
+    return request.remote_addr or "unknown"
+
+
+def rate_limited(scope, limit):
+    now = time.monotonic()
+    key = (scope, _client_key())
+    with _rate_lock:
+        attempts = [t for t in _rate_attempts.get(key, []) if now - t < RATE_WINDOW_SECONDS]
+        _rate_attempts[key] = attempts
+        return len(attempts) >= limit
+
+
+def failed_attempt_count(scope):
+    now = time.monotonic()
+    key = (scope, _client_key())
+    with _rate_lock:
+        attempts = [t for t in _rate_attempts.get(key, []) if now - t < RATE_WINDOW_SECONDS]
+        _rate_attempts[key] = attempts
+        return len(attempts)
+
+
+def record_failed_attempt(scope):
+    key = (scope, _client_key())
+    with _rate_lock:
+        now = time.monotonic()
+        attempts = [t for t in _rate_attempts.get(key, []) if now - t < RATE_WINDOW_SECONDS]
+        attempts.append(now)
+        _rate_attempts[key] = attempts
+
+
+def captcha_question(scope):
+    """5회 이상 실패한 IP에만 서버 메모리 기반 산술 CAPTCHA를 발급한다."""
+    key = (scope, _client_key())
+    now = time.monotonic()
+    with _rate_lock:
+        challenge = _captcha_challenges.get(key)
+        if not challenge or challenge[2] <= now:
+            first, second = secrets.randbelow(8) + 2, secrets.randbelow(8) + 2
+            challenge = (f"{first} + {second}", str(first + second), now + RATE_WINDOW_SECONDS)
+            _captcha_challenges[key] = challenge
+        return challenge[0]
+
+
+def valid_captcha(scope, answer):
+    key = (scope, _client_key())
+    with _rate_lock:
+        challenge = _captcha_challenges.get(key)
+        return bool(challenge and challenge[2] > time.monotonic()
+                    and secrets.compare_digest(str(answer).strip(), challenge[1]))
+
+
+def csrf_token():
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["_csrf_token"] = token
+    return token
+
+
+app.jinja_env.globals["csrf_token"] = csrf_token
+
+
+@app.before_request
+def protect_state_changing_requests():
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return None
+    supplied = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+    expected = session.get("_csrf_token")
+    if not expected or not supplied or not secrets.compare_digest(supplied, expected):
+        abort(400, "CSRF 검증에 실패했습니다. 페이지를 새로고침 후 다시 시도해주세요.")
 
 
 # ---------------------------------------------------------------------------
@@ -144,13 +232,8 @@ SCHEMA_STATEMENTS = [
         created_at TEXT NOT NULL,
         confirmed_at TEXT,
         scheduled_at TEXT,
-        completed_at TEXT
-    )
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS counters (
-        name TEXT PRIMARY KEY,
-        value INTEGER NOT NULL
+        completed_at TEXT,
+        status_token_hash TEXT
     )
     """,
     # 첨부사진 원본 데이터. 로컬 디스크가 휘발성인 호스팅(Render 무료 등)에서도
@@ -172,6 +255,7 @@ SCHEMA_STATEMENTS = [
 # 오류가 발생하므로 무시한다(멱등 처리).
 MIGRATIONS = [
     "ALTER TABLE requests ADD COLUMN checked_by TEXT",
+    "ALTER TABLE requests ADD COLUMN status_token_hash TEXT",
 ]
 
 
@@ -184,34 +268,22 @@ def init_db():
             conn.execute(stmt)
         except Exception:
             pass  # 이미 컬럼이 존재하는 등 정상적으로 무시 가능한 오류
-    cur = conn.execute("SELECT value FROM counters WHERE name = 'request_id'")
-    if cur.fetchone() is None:
-        conn.execute(
-            "INSERT INTO counters (name, value) VALUES ('request_id', ?)",
-            (START_ID - 1,),
-        )
     conn.commit()
     conn.close()
 
 
 def next_request_id(conn):
-    """접수번호 채번. Turso 사용 시에는 두 문장을 한 파이프라인 요청(동일 커넥션)으로
-    묶어 처리하여 증가값 조회의 원자성을 최대한 보장한다."""
-    if hasattr(conn, "execute_batch"):
-        cursors = conn.execute_batch(
-            [
-                ("UPDATE counters SET value = value + 1 WHERE name = 'request_id'", ()),
-                ("SELECT value FROM counters WHERE name = 'request_id'", ()),
-            ]
-        )
-        return cursors[1].fetchone()["value"]
-    conn.execute(
-        "UPDATE counters SET value = value + 1 WHERE name = 'request_id'"
-    )
-    row = conn.execute(
-        "SELECT value FROM counters WHERE name = 'request_id'"
-    ).fetchone()
-    return row["value"]
+    """추측을 어렵게 하는 6자리 난수 접수번호를 발급한다.
+
+    PK 충돌을 막기 위해 이미 사용 중인 번호는 다시 뽑는다. 90만 개 공간이므로
+    일반적인 접수량에서는 충돌 확률이 매우 낮고, 최종적으로 DB PK도 중복을 막는다.
+    """
+    for _ in range(100):
+        request_id = secrets.randbelow(900_000) + 100_000
+        exists = conn.execute("SELECT 1 FROM requests WHERE id = ?", (request_id,)).fetchone()
+        if not exists:
+            return request_id
+    raise RuntimeError("접수번호를 발급하지 못했습니다. 잠시 후 다시 시도해주세요.")
 
 
 def now_iso():
@@ -248,6 +320,28 @@ def row_to_dict(row):
     return d
 
 
+def normalize_image(file_storage):
+    """실제 이미지인지 확인하고 메타데이터 없이 JPEG로 재인코딩한다."""
+    raw = file_storage.read()
+    if not raw:
+        raise ValueError("빈 파일입니다.")
+    try:
+        Image.MAX_IMAGE_PIXELS = 25_000_000
+        with Image.open(io.BytesIO(raw)) as image:
+            image.verify()
+        with Image.open(io.BytesIO(raw)) as image:
+            if image.width * image.height > 25_000_000:
+                raise ValueError("이미지 해상도가 너무 큽니다.")
+            image.load()
+            # GIF/WebP의 애니메이션 및 EXIF 등을 제거하고 안전한 단일 JPEG로 변환한다.
+            image = image.convert("RGB")
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=88, optimize=True)
+            return output.getvalue()
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError) as exc:
+        raise ValueError("유효한 이미지 파일만 첨부할 수 있습니다.") from exc
+
+
 # ---------------------------------------------------------------------------
 # 인증 (담당자)
 # ---------------------------------------------------------------------------
@@ -264,18 +358,25 @@ def manager_required(view):
 def login():
     error = None
     if request.method == "POST":
+        if rate_limited("login", 5):
+            error = "로그인 시도가 너무 많습니다. 15분 후 다시 시도해주세요."
+            return render_template("login.html", error=error), 429
         code = request.form.get("passcode", "")
         if secrets.compare_digest(code, MANAGER_PASSCODE):
+            session.clear()
             session["is_manager"] = True
-            nxt = request.args.get("next") or url_for("dashboard")
+            nxt = request.args.get("next", "")
+            if not nxt.startswith("/") or nxt.startswith("//"):
+                nxt = url_for("dashboard")
             return redirect(nxt)
+        record_failed_attempt("login")
         error = "접속코드가 일치하지 않습니다."
     return render_template("login.html", error=error)
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 def logout():
-    session.pop("is_manager", None)
+    session.clear()
     return redirect(url_for("login"))
 
 
@@ -321,17 +422,20 @@ def submit():
         ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
         if ext not in ALLOWED_EXT:
             continue
-        safe_name = secure_filename(f.filename)
-        fname = f"{secrets.token_hex(4)}_{safe_name}"
+        try:
+            data = normalize_image(f)
+        except ValueError:
+            conn.close()
+            return jsonify({"ok": False, "error": "사진은 2,500만 화소 이하의 정상 이미지여야 합니다."}), 400
+        fname = f"{secrets.token_hex(16)}.jpg"
         if USE_TURSO:
-            data = f.read()
-            mimetype = f.mimetype or mimetypes.guess_type(fname)[0] or "application/octet-stream"
             conn.execute(
                 "INSERT INTO photos (request_id, filename, mimetype, data, created_at) VALUES (?,?,?,?,?)",
-                (req_id, fname, mimetype, data, now_iso()),
+                (req_id, fname, "image/jpeg", data, now_iso()),
             )
         else:
-            f.save(os.path.join(UPLOAD_DIR, str(req_id), fname))
+            with open(os.path.join(UPLOAD_DIR, str(req_id), fname), "wb") as output:
+                output.write(data)
         saved_photos.append(fname)
 
     created = now_iso()
@@ -356,7 +460,6 @@ def submit():
     )
     conn.commit()
     conn.close()
-
     return jsonify({"ok": True, "request_id": req_id})
 
 
@@ -367,11 +470,23 @@ def submit():
 def status_check():
     result = None
     error = None
-    prefill_id = request.args.get("id", "")
+    prefill_id = ""
 
     if request.method == "POST":
+        if rate_limited("status", 10):
+            error = "조회 시도가 너무 많습니다. 15분 후 다시 시도해주세요."
+            return render_template("status_check.html", result=None, error=error, stages=STAGES,
+                                   prefill_id="", captcha_required=True,
+                                   captcha_question=captcha_question("status")), 429
         req_id = request.form.get("request_id", "").strip()
         phone_last4 = request.form.get("phone_last4", "").strip()
+        captcha_required = failed_attempt_count("status") >= 5
+        if captcha_required and not valid_captcha("status", request.form.get("captcha", "")):
+            record_failed_attempt("status")
+            error = "사람 확인 답이 일치하지 않습니다."
+            return render_template("status_check.html", result=None, error=error, stages=STAGES,
+                                   prefill_id="", captcha_required=True,
+                                   captcha_question=captcha_question("status")), 400
         conn = get_db()
         row = None
         if req_id.isdigit():
@@ -380,6 +495,7 @@ def status_check():
             ).fetchone()
         conn.close()
         if not row or not row["phone"].endswith(phone_last4) or len(phone_last4) != 4:
+            record_failed_attempt("status")
             error = "접수번호 또는 연락처 뒷 4자리가 일치하지 않습니다."
         else:
             result = row_to_dict(row)
@@ -391,6 +507,8 @@ def status_check():
         error=error,
         stages=STAGES,
         prefill_id=prefill_id,
+        captcha_required=failed_attempt_count("status") >= 5,
+        captcha_question=captcha_question("status") if failed_attempt_count("status") >= 5 else None,
     )
 
 
@@ -642,6 +760,7 @@ def summary():
 # 업로드 사진 서빙 — Turso 사용 시 DB(photos 테이블)에서, 아니면 로컬 디스크에서 서빙
 # ---------------------------------------------------------------------------
 @app.route("/uploads/<int:req_id>/<path:filename>")
+@manager_required
 def uploaded_file(req_id, filename):
     if USE_TURSO:
         conn = get_db()
@@ -652,7 +771,7 @@ def uploaded_file(req_id, filename):
         conn.close()
         if not row:
             abort(404)
-        return Response(row["data"], mimetype=row["mimetype"] or "application/octet-stream")
+        return Response(row["data"], content_type="image/jpeg", headers={"X-Content-Type-Options": "nosniff"})
     return send_from_directory(os.path.join(UPLOAD_DIR, str(req_id)), filename)
 
 

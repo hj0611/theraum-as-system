@@ -26,6 +26,7 @@
   <div class="action-form">
     {% if it.status == '접수완료' %}
     <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}" class="check-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="check">
       <input type="text" name="checked_by" class="input-checked-by" placeholder="담당자 성함" required>
       <button class="btn btn-outline btn-sm" type="submit">담당자 확인</button>
@@ -34,6 +35,7 @@
 
     {% if it.status in ['접수완료','담당자확인'] %}
     <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}" class="action-form" style="margin:0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="schedule">
       <input type="date" name="scheduled_date" required style="width:150px">
       <button class="btn btn-outline btn-sm" type="submit">일정편성완료</button>
@@ -42,6 +44,7 @@
 
     {% if it.status != '처리완료' %}
     <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="complete">
       <button class="btn btn-primary btn-sm" type="submit">처리완료</button>
     </form>
@@ -49,6 +52,7 @@
 
     {% if it.status != '접수완료' %}
     <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}" onsubmit="return confirm('이전 단계로 되돌리시겠습니까?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="revert">
       <button class="btn btn-revert btn-sm" type="submit">◀ 이전 단계로</button>
     </form>
