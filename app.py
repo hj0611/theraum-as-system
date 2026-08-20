@@ -68,6 +68,41 @@ if os.environ.get("MANAGER_PASSCODE") is None:
 
 
 # ---------------------------------------------------------------------------
+# 보안 헤더
+# 페이지가 쓰는 외부 리소스(카카오 우편번호 검색 iframe, jsDelivr 폰트/CSS,
+# 다음 우편번호 스크립트)와 인라인 <script>/style 속성을 계속 쓰기 위해
+# script-src/style-src에는 'unsafe-inline'을 허용한다. 그 외에는 기본적으로
+# 자기 출처(self)만 허용하는 화이트리스트 방식.
+# ---------------------------------------------------------------------------
+CSP_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://t1.daumcdn.net",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "font-src 'self' https://cdn.jsdelivr.net",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "frame-src https://postcode.map.kakao.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+
+
+@app.after_request
+def set_security_headers(response):
+    response.headers["Content-Security-Policy"] = CSP_POLICY
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Render는 HTTPS를 강제하므로 HSTS를 켜도 안전하다. 서브도메인은 아직
+    # 없어서 includeSubDomains만 넣고, hstspreload 목록 등록이 필요한
+    # preload는 되돌리기 까다로워 일단 넣지 않는다.
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
+# ---------------------------------------------------------------------------
 # DB 유틸리티
 # ---------------------------------------------------------------------------
 USE_TURSO = db_turso.is_configured()
