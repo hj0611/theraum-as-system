@@ -4,7 +4,8 @@
       <input type="checkbox" class="req-checkbox" value="{{ it.id }}" aria-label="#{{ it.id }} 선택">
       <div>
         <div class="req-id">#{{ it.id }} · {{ it.category }}</div>
-        <div class="req-meta">{{ it.complex_name }} {{ it.dong }} {{ it.ho }} · {{ it.customer_name }} · {{ it.created_at.replace("T"," ") }}{% if it.checked_by %} · 확인자: {{ it.checked_by }}{% endif %}</div>
+        <div class="req-address">{{ it.complex_name }} {{ it.dong }} {{ it.ho }}</div>
+        <div class="req-submeta">{{ it.customer_name }} · {{ it.created_at.replace("T"," ") }}{% if it.checked_by %} · 확인자: {{ it.checked_by }}{% endif %}</div>
       </div>
     </div>
     <div class="badge-row">
@@ -43,6 +44,13 @@
     <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}">
       <input type="hidden" name="action" value="complete">
       <button class="btn btn-primary btn-sm" type="submit">처리완료</button>
+    </form>
+    {% endif %}
+
+    {% if it.status != '접수완료' %}
+    <form method="post" action="{{ url_for('manager_update', req_id=it.id) }}" onsubmit="return confirm('이전 단계로 되돌리시겠습니까?');">
+      <input type="hidden" name="action" value="revert">
+      <button class="btn btn-revert btn-sm" type="submit">◀ 이전 단계로</button>
     </form>
     {% endif %}
   </div>

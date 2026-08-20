@@ -192,12 +192,13 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
   border: 1px solid transparent;
   cursor: pointer;
   width: 100%;
+  white-space: nowrap;
 }
 .btn-primary { background: var(--raum-black); color: var(--raum-white); }
 .btn-primary:hover { background: #000; }
 .btn-outline { background: var(--raum-white); border-color: var(--raum-gray-300); color: var(--raum-ink); }
 .btn-outline:hover { background: var(--raum-gray-100); }
-.btn-sm { width: auto; padding: 8px 12px; font-size: 13px; }
+.btn-sm { width: auto; height: 38px; padding: 0 12px; font-size: 13px; }
 .btn-danger { background: var(--raum-red); color: var(--raum-white); }
 .btn-row { display: flex; gap: 8px; }
 
@@ -362,18 +363,26 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
 .req-top-left { display: flex; align-items: flex-start; gap: 10px; }
 .req-checkbox { width: 17px; height: 17px; margin-top: 3px; flex: none; cursor: pointer; accent-color: var(--raum-black); }
 .request-item .req-id { font-weight: 700; font-size: 14.5px; }
-.request-item .req-meta { font-size: 12.5px; color: var(--raum-gray-500); margin-bottom: 8px; }
+.request-item .req-address { font-size: 13.5px; font-weight: 600; color: var(--raum-ink); margin-top: 3px; line-height: 1.4; }
+.request-item .req-submeta { font-size: 12px; color: var(--raum-gray-500); margin-top: 2px; margin-bottom: 8px; line-height: 1.4; }
 .request-item .req-desc { font-size: 13.5px; color: var(--raum-ink); margin-bottom: 10px; line-height: 1.5; }
 .req-photos { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
 .req-photos img { width: 54px; height: 54px; object-fit: cover; border-radius: 6px; border: 1px solid var(--raum-line); }
 .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .action-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
-.check-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0; }
+/* 각 액션 폼(담당자 확인 / 일정편성 / 처리완료)은 하나의 단위로만 다음 줄로 넘어가야 하며,
+   폼 내부의 입력칸·버튼끼리 따로 줄바꿈되어서는 안 된다. */
+.action-form > form { flex: none; }
+.check-form { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; margin: 0; }
+/* 담당자 성함 입력칸 · 일정편성 날짜칸 · 버튼의 높이를 동일하게 맞춘다 */
 .input-checked-by {
-  width: 110px; padding: 8px 10px; font-size: 13px;
+  width: 110px; height: 38px; padding: 0 10px; font-size: 13px;
   border: 1px solid var(--raum-gray-300); border-radius: 8px; background: var(--raum-white); color: var(--raum-ink);
 }
+.action-form input[type="date"] { height: 38px; padding: 0 10px; font-size: 13px; }
+.btn-revert { background: var(--raum-white); border-color: var(--raum-gray-300); color: var(--raum-gray-500); }
+.btn-revert:hover { background: var(--raum-gray-100); color: var(--raum-red); border-color: var(--raum-red); }
 
 /* ---------------- 건별 선택 삭제 ---------------- */
 .bulk-actions {
@@ -439,6 +448,7 @@ table.data-table td.desc-cell { white-space: normal; max-width: 240px; }
 
 /* ---------------- Summary page ---------------- */
 .month-select { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.month-select label { white-space: nowrap; flex: none; }
 .cat-bar-row { display: flex; align-items: center; gap: 10px; font-size: 13px; margin-bottom: 8px; }
 .cat-bar-label { width: 96px; flex-shrink: 0; color: var(--raum-gray-700); }
 .cat-bar-track { flex: 1; background: var(--raum-gray-100); border-radius: 6px; height: 10px; overflow: hidden; }

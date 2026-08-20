@@ -470,6 +470,31 @@ def manager_update(req_id):
     elif action == "memo":
         memo = request.form.get("memo", "")
         conn.execute("UPDATE requests SET memo = ? WHERE id = ?", (memo, req_id))
+    elif action == "revert":
+        # 잘못 넘어간 단계를 한 단계 이전으로 되돌린다. 되돌아가는 단계에서
+        # 기록됐던 시각/값은 함께 초기화하여 소요일 계산이 어긋나지 않게 한다.
+        cur_idx = STAGES.index(row["status"])
+        if cur_idx > 0:
+            prev_status = STAGES[cur_idx - 1]
+            if row["status"] == "담당자확인":
+                conn.execute(
+                    """UPDATE requests
+                       SET status = ?, manager_checked = 0, checked_by = NULL, confirmed_at = NULL
+                       WHERE id = ?""",
+                    (prev_status, req_id),
+                )
+            elif row["status"] == "일정편성완료":
+                conn.execute(
+                    """UPDATE requests
+                       SET status = ?, scheduled_date = NULL, scheduled_at = NULL
+                       WHERE id = ?""",
+                    (prev_status, req_id),
+                )
+            elif row["status"] == "처리완료":
+                conn.execute(
+                    "UPDATE requests SET status = ?, completed_at = NULL WHERE id = ?",
+                    (prev_status, req_id),
+                )
 
     conn.commit()
     conn.close()
