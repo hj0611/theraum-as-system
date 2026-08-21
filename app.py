@@ -25,6 +25,7 @@ from flask import (
     Flask, request, session, redirect, url_for, render_template,
     jsonify, flash, send_from_directory, abort, Response
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 from PIL import Image, UnidentifiedImageError
 
 import db_turso
@@ -58,6 +59,12 @@ def kst_now():
     return datetime.now(KST).replace(tzinfo=None)
 
 app = Flask(__name__)
+# Render(및 그 앞단 엣지)는 요청을 한 번 프록시해서 앱 컨테이너로 전달하므로,
+# 프록시를 거치지 않은 request.remote_addr는 방문자 IP가 아니라 프록시 홉의 주소를
+# 가리킨다. rate_limited() 등이 방문자별로 정확히 집계되도록 Render가 넣어주는
+# X-Forwarded-For/X-Forwarded-Proto의 첫 번째 값(신뢰할 수 있는 프록시 한 홉)을
+# 실제 요청 정보로 사용하도록 한다.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
     raise RuntimeError("SECRET_KEY 환경변수는 운영에 반드시 필요합니다.")
