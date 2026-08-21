@@ -576,6 +576,32 @@ def status_check():
 
 
 # ---------------------------------------------------------------------------
+# 임시 진단용 라우트 — request.remote_addr가 방문자별로 안정적으로 잡히는지
+# (즉 ProxyFix의 X-Forwarded-For 신뢰 홉 수(x_for)가 맞는지) 프로덕션에서 직접
+# 확인하기 위한 것. 원인 확인 후 반드시 제거한다.
+# ---------------------------------------------------------------------------
+@app.route("/manager/proxy-diag")
+@manager_required
+def proxy_diag():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT client_key, COUNT(*) AS c FROM rate_limit_attempts "
+        "WHERE scope = 'status' GROUP BY client_key ORDER BY c DESC"
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        "build_marker": "proxy-diag-2026-08-21a",
+        "pid": os.getpid(),
+        "use_turso": USE_TURSO,
+        "remote_addr_after_proxyfix": request.remote_addr,
+        "x_forwarded_for_header": request.headers.get("X-Forwarded-For"),
+        "x_forwarded_proto_header": request.headers.get("X-Forwarded-Proto"),
+        "proxyfix_orig": request.environ.get("werkzeug.proxy_fix.orig"),
+        "status_scope_buckets": [dict(r) for r in rows],
+    })
+
+
+# ---------------------------------------------------------------------------
 # 4) 담당자 대시보드 (캘린더 기본, 목록 보조)
 # ---------------------------------------------------------------------------
 @app.route("/dashboard")
